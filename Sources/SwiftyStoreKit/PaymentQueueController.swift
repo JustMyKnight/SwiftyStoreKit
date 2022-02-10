@@ -37,6 +37,7 @@ protocol TransactionController {
 
 public enum TransactionResult {
     case purchased(purchase: PurchaseDetails)
+    case redeemed(purchase: PurchaseCodeRedemptionDetails)
     case restored(purchase: Purchase)
     case deferred(purchase: PurchaseDetails)
     case failed(error: SKError)
@@ -57,6 +58,9 @@ public protocol PaymentQueue: AnyObject {
     func restoreCompletedTransactions(withApplicationUsername username: String?)
     
     func finishTransaction(_ transaction: SKPaymentTransaction)
+    
+    @available(iOS 14.0, *)
+        func presentCodeRedemptionSheet()
 }
 
 extension SKPaymentQueue: PaymentQueue {
@@ -103,6 +107,7 @@ struct EntitlementRevocation {
 class PaymentQueueController: NSObject, SKPaymentTransactionObserver {
     
     private let paymentsController: PaymentsController
+    private let codeRedemptionController: CodeRedemptionController
     private let restorePurchasesController: RestorePurchasesController
     private let completeTransactionsController: CompleteTransactionsController
     unowned let paymentQueue: PaymentQueue
@@ -113,12 +118,14 @@ class PaymentQueueController: NSObject, SKPaymentTransactionObserver {
     }
     
     init(paymentQueue: PaymentQueue = SKPaymentQueue.default(),
+         codeRedemptionController: CodeRedemptionController = CodeRedemptionController(),
          paymentsController: PaymentsController = PaymentsController(),
          restorePurchasesController: RestorePurchasesController = RestorePurchasesController(),
          completeTransactionsController: CompleteTransactionsController = CompleteTransactionsController()) {
         
         self.paymentQueue = paymentQueue
         self.paymentsController = paymentsController
+        self.codeRedemptionController = codeRedemptionController
         self.restorePurchasesController = restorePurchasesController
         self.completeTransactionsController = completeTransactionsController
         super.init()
@@ -131,7 +138,12 @@ class PaymentQueueController: NSObject, SKPaymentTransactionObserver {
         assert(completeTransactionsController.completeTransactions != nil, message)
     }
     
+    private func clearCompletionCodeRedemptionController() {
+        codeRedemptionController.clearCodeRedemption()
+    }
+    
     func startPayment(_ payment: Payment) {
+        clearCompletionCodeRedemptionController()
         assertCompleteTransactionsWasCalled()
         
         let skPayment = SKMutablePayment(product: payment.product)
@@ -165,6 +177,7 @@ class PaymentQueueController: NSObject, SKPaymentTransactionObserver {
     }
     
     func restorePurchases(_ restorePurchases: RestorePurchases) {
+        clearCompletionCodeRedemptionController()
         assertCompleteTransactionsWasCalled()
         
         if restorePurchasesController.restorePurchases != nil {
@@ -192,6 +205,15 @@ class PaymentQueueController: NSObject, SKPaymentTransactionObserver {
         }
         paymentQueue.finishTransaction(skTransaction)
     }
+    
+    @available(iOS 14.0, *)
+     func presentCodeRedemptionSheet(_ codeRedemption: CodeRedemption) {
+         assertCompleteTransactionsWasCalled()
+
+         codeRedemptionController.set(codeRedemption)
+
+         paymentQueue.presentCodeRedemptionSheet()
+     }
     
     func start(_ downloads: [SKDownload]) {
         paymentQueue.start(downloads)
@@ -242,7 +264,7 @@ class PaymentQueueController: NSObject, SKPaymentTransactionObserver {
         if unhandledTransactions.count > 0 {
             
             unhandledTransactions = paymentsController.processTransactions(transactions, on: paymentQueue)
-            
+            unhandledTransactions = codeRedemptionController.processTransactions(unhandledTransactions, on: paymentQueue)
             unhandledTransactions = restorePurchasesController.processTransactions(unhandledTransactions, on: paymentQueue)
             
             unhandledTransactions = completeTransactionsController.processTransactions(unhandledTransactions, on: paymentQueue)
