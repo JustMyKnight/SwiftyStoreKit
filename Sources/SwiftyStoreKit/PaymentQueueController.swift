@@ -59,8 +59,10 @@ public protocol PaymentQueue: AnyObject {
     
     func finishTransaction(_ transaction: SKPaymentTransaction)
     
-    @available(iOS 14.0, *)
-        func presentCodeRedemptionSheet()
+    #if os(iOS)
+        @available(iOS 14.0, *)
+            func presentCodeRedemptionSheet()
+    #endif
 }
 
 extension SKPaymentQueue: PaymentQueue {
@@ -206,14 +208,14 @@ class PaymentQueueController: NSObject, SKPaymentTransactionObserver {
         paymentQueue.finishTransaction(skTransaction)
     }
     
+    #if os(iOS)
     @available(iOS 14.0, *)
      func presentCodeRedemptionSheet(_ codeRedemption: CodeRedemption) {
-         assertCompleteTransactionsWasCalled()
-
-         codeRedemptionController.set(codeRedemption)
-
-         paymentQueue.presentCodeRedemptionSheet()
+            assertCompleteTransactionsWasCalled()
+            codeRedemptionController.set(codeRedemption)
+            paymentQueue.presentCodeRedemptionSheet()
      }
+    #endif
     
     func start(_ downloads: [SKDownload]) {
         paymentQueue.start(downloads)

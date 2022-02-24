@@ -86,13 +86,14 @@ public class SwiftyStoreKit {
     }
     
     fileprivate func redeemOfferCode(atomically: Bool, completion: @escaping (CodeRedemptionResult) -> Void) {
+            #if os(iOS)
+                if #available(iOS 14.0, *) {
+                    paymentQueueController.presentCodeRedemptionSheet(CodeRedemption(atomically: atomically) { result in
 
-            if #available(iOS 14.0, *) {
-                paymentQueueController.presentCodeRedemptionSheet(CodeRedemption(atomically: atomically) { result in
-
-                    completion(self.processCodeRedemptionResult(result))
-                })
-            }
+                        completion(self.processCodeRedemptionResult(result))
+                    })
+                }
+            #endif
         }
     
     fileprivate func onEntitlementRevocation(completion: @escaping ([String]) -> Void) {
